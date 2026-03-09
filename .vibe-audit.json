@@ -1,0 +1,6 @@
+{
+  "ignore": ["tests", "data", "legacy/", "vendor/"],
+  "exclude": [],
+  "format": "terminal",
+  "strict": true
+}

@@ -1,0 +1,34 @@
+/**
+ * @typedef {'critical' | 'warning' | 'info'} Severity
+ */
+
+/**
+ * @typedef {Object} FileContext
+ * @property {string} path - Absolute path
+ * @property {string} relativePath - Path relative to project root
+ * @property {string} content - Full file content
+ * @property {string[]} lines - Content split by newline
+ */
+
+/**
+ * @typedef {Object} Finding
+ * @property {string} ruleId
+ * @property {string} ruleName
+ * @property {Severity} severity
+ * @property {string} message - What's wrong
+ * @property {string} file - Relative file path
+ * @property {number} [line] - 1-indexed line number
+ * @property {string} [evidence] - Sanitized snippet (secrets redacted)
+ * @property {string} fix - How to fix it (plain English or copy-paste prompt)
+ */
+
+/**
+ * @typedef {Object} Rule
+ * @property {string} id - Unique kebab-case identifier
+ * @property {string} name - Human-readable name
+ * @property {Severity} severity - Default severity
+ * @property {string} description - What this rule checks
+ * @property {(file: FileContext) => Finding[]} check - The check function
+ */
+
+export {};
