@@ -56,7 +56,8 @@ function reportTerminal(findings, meta) {
     for (const f of fileFindings) {
       const icon = severityIcon(f.severity);
       const lineStr = f.line ? gray(`:${f.line}`) : '';
-      console.log(`    ${icon}  ${f.message}${lineStr}`);
+      const cweStr = f.cweId ? dim(` [${f.cweId}]`) : '';
+      console.log(`    ${icon}  ${f.message}${lineStr}${cweStr}`);
       if (f.evidence) {
         console.log(`        ${dim(f.evidence)}`);
       }
@@ -115,9 +116,12 @@ function reportJSON(findings, meta) {
   // Enrich findings with fix prompts.
   const enriched = findings.map((f) => {
     const promptData = getFixPrompt(f.ruleId);
-    return promptData
-      ? { ...f, prompt: promptData.prompt, platformNotes: promptData.platformNotes }
-      : f;
+    const entry = { ...f };
+    if (promptData) {
+      entry.prompt = promptData.prompt;
+      entry.platformNotes = promptData.platformNotes;
+    }
+    return entry;
   });
 
   const output = {
@@ -161,7 +165,8 @@ function reportMarkdown(findings, meta) {
     lines.push('**✅ No issues found.**');
   } else {
     const renderFinding = (f) => {
-      lines.push(`### \`${f.file}\`${f.line ? `:${f.line}` : ''}`);
+      const cweBadge = f.cweId ? ` \`${f.cweId}\`` : '';
+      lines.push(`### \`${f.file}\`${f.line ? `:${f.line}` : ''}${cweBadge}`);
       lines.push(`- **${f.message}**`);
       if (f.evidence) lines.push(`- Evidence: \`${f.evidence}\``);
       lines.push(`- Fix: ${f.fix}`);

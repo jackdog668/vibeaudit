@@ -22,6 +22,7 @@ import { parseArgs } from 'node:util';
 import { audit } from '../src/index.js';
 import { generateFixes } from '../src/fix.js';
 import { ALL_RULES } from '../src/rules/index.js';
+import { CWE_MAP } from '../src/data/cwe-map.js';
 import { bold, cyan, dim, green, red, yellow, gray } from '../src/colors.js';
 
 const { values, positionals } = parseArgs({
@@ -33,6 +34,8 @@ const { values, positionals } = parseArgs({
     strict: { type: 'boolean', short: 's' },
     fix: { type: 'boolean' },
     'fix-file': { type: 'boolean' },
+    'skip-sca': { type: 'boolean' },
+    deep: { type: 'boolean' },
     'list-rules': { type: 'boolean' },
     help: { type: 'boolean', short: 'h' },
     version: { type: 'boolean', short: 'v' },
@@ -55,6 +58,8 @@ ${bold('OPTIONS')}
   ${cyan('-s, --strict')}                            Exit 1 on warnings too
   ${cyan('--fix')}                                   Show copy-paste fix prompts + save VIBE-AUDIT-FIXES.md
   ${cyan('--fix-file')}                              Only save fix file (no terminal prompts)
+  ${cyan('--skip-sca')}                              Skip dependency vulnerability scanning
+  ${cyan('--deep')}                                  Enable deep scanning (git history secrets)
   ${cyan('--list-rules')}                            Show all available rules
   ${cyan('-h, --help')}                              Show this help
   ${cyan('-v, --version')}                           Show version
@@ -113,7 +118,9 @@ if (values['list-rules']) {
           ? yellow('WARN')
           : cyan('INFO');
 
-    console.log(`  ${sev}  ${bold(rule.id)}`);
+    const cwe = CWE_MAP[rule.id];
+    const cweStr = cwe ? gray(` [${cwe.cweId}]`) : '';
+    console.log(`  ${sev}  ${bold(rule.id)}${cweStr}`);
     console.log(`       ${dim(rule.description)}`);
     console.log('');
   }
@@ -130,6 +137,8 @@ const cliOptions = {
   rules: values.rules?.split(',').filter(Boolean),
   exclude: values.exclude?.split(',').filter(Boolean),
   strict: values.strict,
+  skipSca: values['skip-sca'],
+  deep: values.deep,
 };
 
 try {

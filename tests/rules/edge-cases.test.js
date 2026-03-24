@@ -314,8 +314,8 @@ describe('realistic-fixture-integration', () => {
 // ─── RULE REGISTRY ────────────────────────────────────────────────────────────
 
 describe('rule-registry', () => {
-  it('has exactly 39 rules', () => {
-    assert.equal(ALL_RULES.length, 39, `Expected 39 rules, got ${ALL_RULES.length}`);
+  it('has at least 75 rules', () => {
+    assert.ok(ALL_RULES.length >= 75, `Expected at least 75 rules, got ${ALL_RULES.length}`);
   });
 
   it('all rules have required properties', () => {

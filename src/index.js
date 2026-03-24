@@ -2,6 +2,8 @@ import { discoverFiles } from './scanner.js';
 import { resolveRules } from './rules/index.js';
 import { report } from './reporter.js';
 import { loadConfig } from './config.js';
+import { CWE_MAP } from './data/cwe-map.js';
+import { runSCA } from './sca/index.js';
 
 /**
  * Run the full audit pipeline.
@@ -12,6 +14,8 @@ import { loadConfig } from './config.js';
  * @param {string[]} [cliOptions.rules]
  * @param {string[]} [cliOptions.exclude]
  * @param {boolean} [cliOptions.strict]
+ * @param {boolean} [cliOptions.skipSca]
+ * @param {boolean} [cliOptions.deep]
  * @returns {Promise<{ findings: import('./rules/types.js').Finding[], exitCode: number }>}
  */
 export async function audit(targetDir, cliOptions = {}) {
@@ -23,6 +27,8 @@ export async function audit(targetDir, cliOptions = {}) {
   const ruleIds = cliOptions.rules?.length ? cliOptions.rules : config.rules;
   const excludeIds = cliOptions.exclude?.length ? cliOptions.exclude : config.exclude;
   const strict = cliOptions.strict ?? config.strict;
+  const skipSca = cliOptions.skipSca ?? false;
+  const deep = cliOptions.deep ?? false;
 
   // Resolve which rules to run.
   const rules = resolveRules(ruleIds, excludeIds);
@@ -34,6 +40,8 @@ export async function audit(targetDir, cliOptions = {}) {
 
   for await (const file of discoverFiles(targetDir, config.ignore)) {
     filesScanned++;
+    // Pass deep mode flag to rules that need it
+    if (deep) file._deepMode = true;
     for (const rule of rules) {
       try {
         const ruleFindings = rule.check(file);
@@ -45,7 +53,27 @@ export async function audit(targetDir, cliOptions = {}) {
     }
   }
 
+  // SCA: Dependency vulnerability scanning.
+  if (!skipSca) {
+    try {
+      const scaFindings = await runSCA(targetDir);
+      findings.push(...scaFindings);
+    } catch {
+      // SCA failure should not crash the audit.
+    }
+  }
+
   const durationMs = Math.round(performance.now() - start);
+
+  // Enrich findings with CWE/CVSS/OWASP metadata.
+  for (const f of findings) {
+    const meta = CWE_MAP[f.ruleId];
+    if (meta) {
+      f.cweId = meta.cweId;
+      f.cvssScore = meta.cvssScore;
+      f.owaspCategory = meta.owaspCategory;
+    }
+  }
 
   // Sort: criticals first, then warnings, then info.
   const severityOrder = { critical: 0, warning: 1, info: 2 };

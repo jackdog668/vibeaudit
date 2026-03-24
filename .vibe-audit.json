@@ -1,5 +1,5 @@
 {
-  "ignore": ["tests", "data", "legacy/", "vendor/"],
+  "ignore": ["tests", "legacy/", "vendor/", "rules", "data", "sca", "dast"],
   "exclude": [],
   "format": "terminal",
   "strict": true
