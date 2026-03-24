@@ -80,10 +80,11 @@ export async function audit(targetDir, cliOptions = {}) {
   findings.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
 
   // Report.
-  report(findings, format, {
+  await report(findings, format, {
     filesScanned,
     rulesRun: rules.length,
     durationMs,
+    targetDir,
   });
 
   // Exit code: 1 if criticals found, 1 if warnings + strict mode, 0 otherwise.
