@@ -243,6 +243,208 @@ export const FIX_PROMPTS = {
     prompt: `SECURITY FIX: My API routes call paid services with no rate limiting — a bot could run up a massive bill. Add rate limiting before every paid API call. For serverless: use @upstash/ratelimit. For Express: use express-rate-limit. Set per-user AND per-IP limits. Also configure spend alerts and hard spending caps on your API provider dashboards (OpenAI, Anthropic, Stripe, etc.) as a safety net.`,
     platformNotes: `Lovable: Add in backend functions. Firebase: Use App Check + rate limiting in Cloud Functions. Replit: Use express-rate-limit. All platforms: Also set spend alerts on your API provider.`,
   },
+
+  // ─── FRAMEWORK-SPECIFIC (v2) ──────────────────────────────────────────────
+
+  'nextjs-server-action-exposure': {
+    prompt: `SECURITY FIX: My Next.js server actions (files with "use server") have no authentication checks. Server actions are directly callable from the client — anyone can invoke them without being logged in. Add auth verification at the top of EVERY server action: const session = await getServerSession(); if (!session) throw new Error("Unauthorized"). Never assume server actions are protected by the UI.`,
+    platformNotes: `Next.js specific. Use next-auth getServerSession() or clerk auth() at the top of each action.`,
+  },
+
+  'nextjs-middleware-bypass': {
+    prompt: `SECURITY FIX: My Next.js middleware doesn't cover all routes or has no auth logic. Check your middleware.ts matcher config — ensure it covers /api routes. Add authentication checking: verify the session/token and redirect unauthenticated users. Example matcher: matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"].`,
+    platformNotes: `Next.js specific. Works with next-auth, Clerk, or custom JWT verification.`,
+  },
+
+  'nextjs-api-route-no-method-check': {
+    prompt: `SECURITY FIX: My Next.js Pages Router API route accepts all HTTP methods. A DELETE handler responds to GET requests too. Add a method check at the top: if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" }). Better yet, migrate to App Router which uses named exports (GET, POST, etc.) for automatic method routing.`,
+    platformNotes: `Next.js Pages Router specific. App Router handles this automatically via named exports.`,
+  },
+
+  'supabase-missing-rls': {
+    prompt: `SECURITY FIX: My Supabase tables don't have Row Level Security (RLS) enabled. Without RLS, anyone with the anon key can read/write ALL data. For every table: (1) ALTER TABLE your_table ENABLE ROW LEVEL SECURITY; (2) CREATE POLICY "Users can read own data" ON your_table FOR SELECT USING (auth.uid() = user_id); (3) Create similar policies for INSERT, UPDATE, DELETE. Test in the Supabase Dashboard SQL editor.`,
+    platformNotes: `Supabase specific. Go to Authentication > Policies in the Supabase Dashboard to manage RLS visually.`,
+  },
+
+  'supabase-service-key-client': {
+    prompt: `SECURITY FIX: The Supabase service_role key is referenced in client-side code. This key bypasses ALL Row Level Security and gives full admin access to your database. Remove it from client code immediately. Use the anon key for client-side Supabase. Move any operation that needs the service_role key to a server-side API route.`,
+    platformNotes: `Supabase specific. The service_role key should only exist in server-side environment variables.`,
+  },
+
+  'supabase-anon-key-abuse': {
+    prompt: `SECURITY FIX: My code calls Supabase admin operations (auth.admin, direct auth.users access) with the anon key. These operations require the service_role key and will fail or be restricted with the anon key. Move admin operations to a server-side API route that uses the service_role key.`,
+    platformNotes: `Supabase specific. Admin operations must run server-side with the service_role key.`,
+  },
+
+  'firebase-admin-client': {
+    prompt: `SECURITY FIX: Firebase Admin SDK is imported in client-side code. The Admin SDK has FULL access to your database and auth — it must only run on the server. Remove firebase-admin imports from client code. Use the regular Firebase client SDK (firebase/app, firebase/firestore) for client-side code. Move admin operations to Cloud Functions or API routes.`,
+    platformNotes: `Firebase specific. Admin SDK = server only. Client SDK = browser safe.`,
+  },
+
+  'vercel-env-leak': {
+    prompt: `SECURITY FIX: Server-only secrets are exposed via the NEXT_PUBLIC_ prefix. Variables with NEXT_PUBLIC_ are bundled into browser JavaScript. Remove the NEXT_PUBLIC_ prefix from any variable containing SECRET, KEY, TOKEN, PASSWORD, or CREDENTIAL. Access these only in server-side code (API routes, Server Components, server actions) via process.env.VARIABLE_NAME.`,
+    platformNotes: `Vercel/Next.js specific. NEXT_PUBLIC_ = visible to everyone. No prefix = server-only.`,
+  },
+
+  'netlify-redirect-open': {
+    prompt: `SECURITY FIX: My Netlify _redirects or netlify.toml has wildcard proxy/redirect rules pointing to external URLs. An attacker could use these as an open proxy or for phishing. Narrow wildcard rules to specific paths. Verify target domains are trusted. Remove unused redirect rules.`,
+    platformNotes: `Netlify specific. Check both _redirects file and netlify.toml [[redirects]] sections.`,
+  },
+
+  'deployment-config-insecure': {
+    prompt: `SECURITY FIX: My deployment config (vercel.json/netlify.toml) is missing security headers or has insecure CORS settings. Add security headers: X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy: strict-origin-when-cross-origin, Content-Security-Policy. Replace CORS wildcard (*) with your specific domain.`,
+    platformNotes: `Check your platform's config file format for header configuration.`,
+  },
+
+  // ─── AI & API SECURITY (v2) ───────────────────────────────────────────────
+
+  'ai-prompt-injection': {
+    prompt: `SECURITY FIX: User input is being interpolated directly into AI/LLM prompts. An attacker can inject instructions that override your system prompt. Fix: (1) Never put user input in the system message. (2) Use the "user" role for user content. (3) Add input validation and length limits. (4) Consider using structured outputs to constrain AI responses. Example: messages: [{ role: "system", content: YOUR_INSTRUCTIONS }, { role: "user", content: sanitizedUserInput }].`,
+    platformNotes: `All platforms using OpenAI, Anthropic, or other AI APIs. This applies to any AI feature in your app.`,
+  },
+
+  'ai-response-trusted': {
+    prompt: `SECURITY FIX: AI/LLM responses are being passed directly to dangerous sinks (eval, innerHTML, SQL queries). AI output can contain anything — including malicious code. Never use AI output in: eval(), innerHTML, dangerouslySetInnerHTML, SQL string concatenation, or Function constructors. Always sanitize and validate AI responses before use.`,
+    platformNotes: `All platforms. Treat AI output as untrusted user input.`,
+  },
+
+  'ai-cost-exposure': {
+    prompt: `SECURITY FIX: My AI API calls have no max_tokens limit. A single request could generate an expensive response. Add max_tokens to every AI API call: { max_tokens: 1000 } (adjust based on your needs). Also add rate limiting to the API route and set spend alerts on your AI provider dashboard.`,
+    platformNotes: `All platforms using AI APIs. Also set hard spending caps on OpenAI/Anthropic dashboards.`,
+  },
+
+  'stripe-webhook-no-verify': {
+    prompt: `SECURITY FIX: My Stripe webhook handler doesn't verify the webhook signature. Anyone who knows the URL can send fake payment events. Add: const event = stripe.webhooks.constructEvent(rawBody, req.headers["stripe-signature"], process.env.STRIPE_WEBHOOK_SECRET). Important: use the RAW request body, not parsed JSON.`,
+    platformNotes: `All platforms. Requires access to raw request body. For Next.js, disable body parsing in the route config.`,
+  },
+
+  'payment-amount-client': {
+    prompt: `SECURITY FIX: Payment amounts are coming from client-side request data. An attacker can change the amount in DevTools to pay $0.01. Always calculate amounts server-side from your database: look up the product price, multiply by quantity, and use that as the payment amount. Never accept an amount from the client.`,
+    platformNotes: `All platforms with Stripe/payment integration. Price must come from your database, not the client.`,
+  },
+
+  // ─── DATA & PRIVACY (v2) ──────────────────────────────────────────────────
+
+  'pii-logging': {
+    prompt: `SECURITY FIX: My logging statements contain PII (email, phone, SSN, credit card, etc.). Remove PII from all console.log/logger calls. If you need to log user actions, log user IDs or anonymized data only. Use structured logging with field allowlists to prevent accidental PII exposure.`,
+    platformNotes: `All platforms. PII in logs creates GDPR/CCPA compliance issues.`,
+  },
+
+  'missing-data-encryption': {
+    prompt: `SECURITY FIX: Sensitive data (SSN, credit card, etc.) is stored in the database without encryption. Encrypt sensitive fields before storing: use crypto.createCipheriv("aes-256-gcm", key, iv). Store: encrypted text + IV + auth tag. Decrypt on read. Better yet, avoid storing sensitive data if possible — use a payment processor for credit cards.`,
+    platformNotes: `All platforms. For credit cards, use Stripe/payment processor instead of storing directly.`,
+  },
+
+  'graphql-introspection': {
+    prompt: `SECURITY FIX: GraphQL introspection is unconditionally enabled. Attackers can query your entire API schema. Set: introspection: process.env.NODE_ENV !== "production". Also disable playground/GraphiQL in production. This hides your API structure from attackers.`,
+    platformNotes: `Apollo Server, Yoga, Mercurius — all have introspection config options.`,
+  },
+
+  'graphql-depth-limit': {
+    prompt: `SECURITY FIX: My GraphQL server has no query depth or complexity limits. An attacker can craft deeply nested queries that crash your server (DoS). Install graphql-depth-limit: npm install graphql-depth-limit. Add: validationRules: [depthLimit(10)] to your server config. Consider also adding query complexity analysis.`,
+    platformNotes: `All GraphQL servers. Apollo, Yoga, and Mercurius all support validation rules.`,
+  },
+
+  'graphql-no-auth': {
+    prompt: `SECURITY FIX: My GraphQL resolvers have no authentication checks. Any user can call any query or mutation. Add auth to resolvers: check context.user at the top of each resolver. For a global solution, use a middleware/plugin that checks auth before resolvers execute.`,
+    platformNotes: `All GraphQL servers. Use context to pass the authenticated user to resolvers.`,
+  },
+
+  // ─── SESSION & AUTH HARDENING (v2) ────────────────────────────────────────
+
+  'session-fixation': {
+    prompt: `SECURITY FIX: My login handler sets session data without regenerating the session ID. This allows session fixation attacks. After successful authentication: req.session.regenerate((err) => { req.session.userId = user.id; req.session.save(); }). This creates a new session ID, invalidating any pre-set session.`,
+    platformNotes: `Express/Node.js with express-session. Next-auth and Clerk handle this automatically.`,
+  },
+
+  'oauth-state-missing': {
+    prompt: `SECURITY FIX: My OAuth flow doesn't use a state parameter. This is vulnerable to CSRF — an attacker can trick a user into logging in with the attacker's account. Fix: (1) Generate a random state: crypto.randomUUID(). (2) Store it in the session. (3) Add &state=... to the OAuth authorization URL. (4) In the callback, verify the returned state matches the session state.`,
+    platformNotes: `All OAuth implementations. Libraries like next-auth, passport handle state automatically.`,
+  },
+
+  'password-reset-weak': {
+    prompt: `SECURITY FIX: My password reset tokens are predictable or don't expire. Fix: (1) Generate tokens with crypto.randomBytes(32).toString("hex"). (2) Hash the token before storing in DB (like a password). (3) Set expiry: Date.now() + 3600000 (1 hour). (4) Invalidate the token after use. (5) Rate limit the reset request endpoint.`,
+    platformNotes: `All platforms with custom auth. Firebase/Supabase/Clerk handle password reset securely.`,
+  },
+
+  'mfa-bypass': {
+    prompt: `SECURITY FIX: My MFA implementation can be bypassed. Ensure: (1) After password auth, issue a "pending MFA" temporary token — NOT a full session. (2) The MFA verify endpoint requires this temporary token. (3) Only issue a full session after BOTH password AND MFA pass. (4) Don't allow skipping MFA with an else branch.`,
+    platformNotes: `All platforms with custom MFA. Use a proper auth library that handles MFA flow correctly.`,
+  },
+
+  'auth-token-no-expiry': {
+    prompt: `SECURITY FIX: My JWTs are issued without an expiration time. If a token is stolen, it's valid forever. Add: jwt.sign(payload, secret, { expiresIn: "1h" }). Use short-lived access tokens (15 min to 1 hour) with longer-lived refresh tokens. Always verify expiry on the server.`,
+    platformNotes: `All platforms using JWT. Express, Next.js, and all Node.js frameworks.`,
+  },
+
+  // ─── EXPANDED CATEGORIES (v2) ─────────────────────────────────────────────
+
+  'race-condition': {
+    prompt: `SECURITY FIX: My code has check-then-act patterns without atomic operations. Example: checking balance then deducting — two concurrent requests could both pass the check. Fix: Use database transactions: prisma.$transaction() for Prisma, or SELECT ... FOR UPDATE in SQL. For MongoDB, use $inc for atomic counter updates. Never read-check-write without a lock.`,
+    platformNotes: `All platforms with databases. This is especially common in payment/inventory/booking code.`,
+  },
+
+  'nosql-injection': {
+    prompt: `SECURITY FIX: My MongoDB queries use raw request data, allowing NoSQL operator injection. An attacker can send {"$gt": ""} to bypass filters. Fix: (1) Never pass req.body directly to MongoDB queries. (2) Extract specific fields: const { email } = req.body. (3) Cast types explicitly. (4) Strip keys starting with "$" from user input. (5) Use mongoose with schema validation.`,
+    platformNotes: `All platforms using MongoDB/Mongoose. Prisma and other ORMs are not vulnerable to this.`,
+  },
+
+  'xml-xxe': {
+    prompt: `SECURITY FIX: My XML parser has external entity processing enabled. An attacker can read files from your server or make SSRF requests. Fix: Disable external entities in your XML parser config. Better yet, use JSON instead of XML. If you must parse XML, use a parser with secure defaults like fast-xml-parser.`,
+    platformNotes: `All platforms processing XML. Modern JSON APIs are not affected.`,
+  },
+
+  'ldap-injection': {
+    prompt: `SECURITY FIX: User input is concatenated into LDAP queries. An attacker can modify the query to bypass authentication or access unauthorized data. Fix: Escape LDAP special characters: * ( ) \\ NUL / in user input. Use parameterized LDAP filters when your library supports them.`,
+    platformNotes: `Enterprise apps using LDAP/Active Directory for authentication.`,
+  },
+
+  'header-injection': {
+    prompt: `SECURITY FIX: User input is placed in HTTP response headers. An attacker can inject \\r\\n to add arbitrary headers (CRLF injection). Fix: Strip \\r and \\n characters from any user input before placing in headers: value.replace(/[\\r\\n]/g, ""). Better: validate against an allowlist of expected values.`,
+    platformNotes: `All server frameworks. Most modern frameworks sanitize headers automatically.`,
+  },
+
+  'subdomain-takeover': {
+    prompt: `SECURITY FIX: CNAME records or references point to external services that may be deprovisioned. If the service is no longer active, an attacker can claim the subdomain. Verify that all referenced services are still active and provisioned. Remove DNS records for decommissioned services.`,
+    platformNotes: `Infrastructure concern. Check your DNS provider for dangling CNAME records.`,
+  },
+
+  'clickjacking': {
+    prompt: `SECURITY FIX: My app is missing clickjacking protection. An attacker can embed your site in an iframe on their page and trick users into clicking hidden buttons. Add X-Frame-Options: DENY header, or use CSP: frame-ancestors 'none'. If using Express, install helmet — it sets this by default.`,
+    platformNotes: `All web apps. Add headers in your server config, middleware, or deployment config.`,
+  },
+
+  'dangerously-set-inner-html': {
+    prompt: `SECURITY FIX: My React code uses dangerouslySetInnerHTML without sanitization. This is a direct XSS vulnerability. Fix: (1) Best: avoid dangerouslySetInnerHTML entirely — use React's built-in escaping. (2) If HTML rendering is needed, install DOMPurify: npm install dompurify. (3) Use: dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }}.`,
+    platformNotes: `React/Next.js/Remix. React normally prevents XSS — dangerouslySetInnerHTML opts out of that protection.`,
+  },
+
+  'eval-usage': {
+    prompt: `SECURITY FIX: My code uses eval() or new Function() with dynamic arguments. This allows arbitrary code execution. Remove eval(). Alternatives: JSON.parse() for data, a math expression parser for calculations, a proper template engine for templates. eval() is almost never the right tool.`,
+    platformNotes: `All JavaScript platforms. CSP headers can also block eval() as an extra layer.`,
+  },
+
+  'regex-dos': {
+    prompt: `SECURITY FIX: My code has regex patterns with nested quantifiers that could cause catastrophic backtracking (ReDoS). A malicious input string could freeze your server. Fix: (1) Simplify the regex — avoid patterns like (a+)+ or (a|b)*. (2) Add input length limits before regex matching. (3) Use the safe-regex library to validate regex patterns. (4) Consider using string methods instead of regex.`,
+    platformNotes: `All JavaScript platforms. Test regex with long strings to check for backtracking.`,
+  },
+
+  'hardcoded-ip': {
+    prompt: `SECURITY FIX: Hardcoded IP addresses should be in environment variables. Move the IP to: process.env.SERVICE_HOST. This makes deployment flexible and avoids exposing infrastructure details in source code.`,
+    platformNotes: `All platforms. Use environment variables for any host/IP configuration.`,
+  },
+
+  // ─── EXTENDED SECRETS (v2) ────────────────────────────────────────────────
+
+  'high-entropy-strings': {
+    prompt: `SECURITY FIX: A high-entropy string in a variable named like a secret was detected. This may be a hardcoded API key, token, or password. Move it to an environment variable in .env (git-ignored) and reference via process.env.VARIABLE_NAME.`,
+    platformNotes: `All platforms. If it's not a secret, rename the variable to avoid false positives.`,
+  },
+
+  'git-history-secrets': {
+    prompt: `SECURITY FIX: Secrets were found in git history. Even deleted files remain in git history forever. (1) ROTATE the compromised secret immediately — generate a new one. (2) Remove from history: use git-filter-repo or BFG Repo-Cleaner. (3) Force push the cleaned history. (4) If it was ever on a public repo, assume it has been compromised.`,
+    platformNotes: `All platforms. Rotating the secret is more important than cleaning history — do that first.`,
+  },
 };
 
 /**

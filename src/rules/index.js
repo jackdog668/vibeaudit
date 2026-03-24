@@ -47,6 +47,50 @@ import { noBotProtection } from './no-bot-protection.js';
 import { predictableIds } from './predictable-ids.js';
 import { debugModeExposed } from './debug-mode-exposed.js';
 import { secretsInUrls } from './secrets-in-urls.js';
+// Framework-specific rules (v2)
+import { nextjsServerActionExposure } from './nextjs-server-action-exposure.js';
+import { nextjsMiddlewareBypass } from './nextjs-middleware-bypass.js';
+import { nextjsApiRouteNoMethodCheck } from './nextjs-api-route-no-method-check.js';
+import { supabaseMissingRls } from './supabase-missing-rls.js';
+import { supabaseServiceKeyClient } from './supabase-service-key-client.js';
+import { supabaseAnonKeyAbuse } from './supabase-anon-key-abuse.js';
+import { firebaseAdminClient } from './firebase-admin-client.js';
+import { vercelEnvLeak } from './vercel-env-leak.js';
+import { netlifyRedirectOpen } from './netlify-redirect-open.js';
+import { deploymentConfigInsecure } from './deployment-config-insecure.js';
+// AI & API security rules (v2)
+import { aiPromptInjection } from './ai-prompt-injection.js';
+import { aiResponseTrusted } from './ai-response-trusted.js';
+import { aiCostExposure } from './ai-cost-exposure.js';
+import { stripeWebhookNoVerify } from './stripe-webhook-no-verify.js';
+import { paymentAmountClient } from './payment-amount-client.js';
+// Data & privacy rules (v2)
+import { piiLogging } from './pii-logging.js';
+import { missingDataEncryption } from './missing-data-encryption.js';
+import { graphqlIntrospection } from './graphql-introspection.js';
+import { graphqlDepthLimit } from './graphql-depth-limit.js';
+import { graphqlNoAuth } from './graphql-no-auth.js';
+// Session & auth hardening rules (v2)
+import { sessionFixation } from './session-fixation.js';
+import { oauthStateMissing } from './oauth-state-missing.js';
+import { passwordResetWeak } from './password-reset-weak.js';
+import { mfaBypass } from './mfa-bypass.js';
+import { authTokenNoExpiry } from './auth-token-no-expiry.js';
+// Expanded category rules (v2)
+import { raceCondition } from './race-condition.js';
+import { nosqlInjection } from './nosql-injection.js';
+import { xmlXxe } from './xml-xxe.js';
+import { ldapInjection } from './ldap-injection.js';
+import { headerInjection } from './header-injection.js';
+import { subdomainTakeover } from './subdomain-takeover.js';
+import { clickjacking } from './clickjacking.js';
+import { dangerouslySetInnerHtml } from './dangerously-set-inner-html.js';
+import { evalUsage } from './eval-usage.js';
+import { regexDos } from './regex-dos.js';
+import { hardcodedIp } from './hardcoded-ip.js';
+// Extended secrets detection (v2)
+import { highEntropyStrings } from './high-entropy-strings.js';
+import { gitHistorySecrets } from './git-history-secrets.js';
 
 /** @type {import('./types.js').Rule[]} */
 export const ALL_RULES = [
@@ -94,6 +138,50 @@ export const ALL_RULES = [
   predictableIds,
   debugModeExposed,
   secretsInUrls,
+  // Framework-specific (v2)
+  nextjsServerActionExposure,
+  nextjsMiddlewareBypass,
+  nextjsApiRouteNoMethodCheck,
+  supabaseMissingRls,
+  supabaseServiceKeyClient,
+  supabaseAnonKeyAbuse,
+  firebaseAdminClient,
+  vercelEnvLeak,
+  netlifyRedirectOpen,
+  deploymentConfigInsecure,
+  // AI & API security (v2)
+  aiPromptInjection,
+  aiResponseTrusted,
+  aiCostExposure,
+  stripeWebhookNoVerify,
+  paymentAmountClient,
+  // Data & privacy (v2)
+  piiLogging,
+  missingDataEncryption,
+  graphqlIntrospection,
+  graphqlDepthLimit,
+  graphqlNoAuth,
+  // Session & auth hardening (v2)
+  sessionFixation,
+  oauthStateMissing,
+  passwordResetWeak,
+  mfaBypass,
+  authTokenNoExpiry,
+  // Expanded categories (v2)
+  raceCondition,
+  nosqlInjection,
+  xmlXxe,
+  ldapInjection,
+  headerInjection,
+  subdomainTakeover,
+  clickjacking,
+  dangerouslySetInnerHtml,
+  evalUsage,
+  regexDos,
+  hardcodedIp,
+  // Extended secrets (v2)
+  highEntropyStrings,
+  gitHistorySecrets,
 ];
 
 /**

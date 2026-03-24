@@ -20,6 +20,9 @@
  * @property {number} [line] - 1-indexed line number
  * @property {string} [evidence] - Sanitized snippet (secrets redacted)
  * @property {string} fix - How to fix it (plain English or copy-paste prompt)
+ * @property {string} [cweId] - CWE identifier (e.g., "CWE-89")
+ * @property {number} [cvssScore] - CVSS v3.1 base score (0-10)
+ * @property {string} [owaspCategory] - OWASP Top 10 2021 category (e.g., "A03:2021")
  */
 
 /**

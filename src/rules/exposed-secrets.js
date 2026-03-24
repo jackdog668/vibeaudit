@@ -38,6 +38,23 @@ const SECRET_PATTERNS = [
   [/SG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}/g, 'SendGrid API key'],
   // Private keys
   [/-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/g, 'Private key'],
+  // Database URLs with credentials
+  [/(?:postgres|postgresql|mysql|mongodb|mongodb\+srv):\/\/[^:]+:[^@]+@[^/\s'"]+/g, 'Database URL with credentials'],
+  // Discord
+  [/(?:discord|bot).*['"]\s*[:=]\s*['"][A-Za-z0-9_-]{24}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27,}/g, 'Discord bot token', true],
+  // Heroku
+  [/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g, 'Possible Heroku API key / UUID secret', true],
+  // Vercel
+  [/vercel_[A-Za-z0-9_-]{24,}/g, 'Vercel token'],
+  // Cloudflare
+  [/(?:cloudflare|cf).*['"]\s*[:=]\s*['"][A-Za-z0-9_-]{37,}/g, 'Cloudflare API token', true],
+  // DigitalOcean
+  [/dop_v1_[A-Fa-f0-9]{64}/g, 'DigitalOcean personal access token'],
+  [/doo_v1_[A-Fa-f0-9]{64}/g, 'DigitalOcean OAuth token'],
+  // Mailgun
+  [/key-[0-9a-zA-Z]{32}/g, 'Mailgun API key'],
+  // Azure
+  [/(?:DefaultEndpointsProtocol|AccountKey)\s*=\s*[A-Za-z0-9+/=]{40,}/g, 'Azure storage connection string'],
 ];
 
 /** Files where secrets are expected and NOT a problem. */
