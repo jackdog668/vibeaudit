@@ -52,7 +52,7 @@ ${bold('USAGE')}
   ${cyan('npx vibe-audit')} ${dim('[directory]')} ${dim('[options]')}
 
 ${bold('OPTIONS')}
-  ${cyan('-f, --format')} <terminal|json|markdown>  Output format ${dim('(default: terminal)')}
+  ${cyan('-f, --format')} <terminal|json|markdown|html>  Output format ${dim('(default: terminal)')}
   ${cyan('-r, --rules')}  <id,id,...>               Only run these rules
   ${cyan('-e, --exclude')} <id,id,...>               Skip these rules
   ${cyan('-s, --strict')}                            Exit 1 on warnings too
