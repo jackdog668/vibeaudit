@@ -6,9 +6,36 @@ import { CWE_MAP } from './data/cwe-map.js';
 import { runSCA } from './sca/index.js';
 
 /**
+ * Run rules against a file iterator (local or remote).
+ * @param {AsyncIterable} fileSource
+ * @param {Array} rules
+ * @param {boolean} deep
+ * @returns {Promise<{ findings: Array, filesScanned: number }>}
+ */
+async function runRules(fileSource, rules, deep) {
+  const findings = [];
+  let filesScanned = 0;
+
+  for await (const file of fileSource) {
+    filesScanned++;
+    if (deep) file._deepMode = true;
+    for (const rule of rules) {
+      try {
+        const ruleFindings = rule.check(file);
+        findings.push(...ruleFindings);
+      } catch {
+        // A rule should never crash the entire audit.
+      }
+    }
+  }
+
+  return { findings, filesScanned };
+}
+
+/**
  * Run the full audit pipeline.
  *
- * @param {string} targetDir - Absolute path to project root
+ * @param {string} targetDir - Absolute path to project root (or display label for remote)
  * @param {Object} [cliOptions] - Options from CLI flags (override config)
  * @param {string} [cliOptions.format]
  * @param {string[]} [cliOptions.rules]
@@ -16,13 +43,14 @@ import { runSCA } from './sca/index.js';
  * @param {boolean} [cliOptions.strict]
  * @param {boolean} [cliOptions.skipSca]
  * @param {boolean} [cliOptions.deep]
+ * @param {AsyncIterable} [cliOptions.fileSource] - Custom file source (e.g. GitHub API). If provided, skips local file discovery.
  * @returns {Promise<{ findings: import('./rules/types.js').Finding[], exitCode: number }>}
  */
 export async function audit(targetDir, cliOptions = {}) {
   const start = performance.now();
 
-  // Load config, CLI flags override file config.
-  const config = await loadConfig(targetDir);
+  // Load config — for remote scans, use defaults since there's no local config file.
+  const config = cliOptions.fileSource ? { ignore: [], rules: [], exclude: [], format: 'terminal', strict: false } : await loadConfig(targetDir);
   const format = cliOptions.format || config.format;
   const ruleIds = cliOptions.rules?.length ? cliOptions.rules : config.rules;
   const excludeIds = cliOptions.exclude?.length ? cliOptions.exclude : config.exclude;
@@ -33,28 +61,12 @@ export async function audit(targetDir, cliOptions = {}) {
   // Resolve which rules to run.
   const rules = resolveRules(ruleIds, excludeIds);
 
-  // Scan files and run rules.
-  /** @type {import('./rules/types.js').Finding[]} */
-  const findings = [];
-  let filesScanned = 0;
+  // Scan files and run rules — use custom file source or local discovery.
+  const fileSource = cliOptions.fileSource || discoverFiles(targetDir, config.ignore);
+  const { findings, filesScanned } = await runRules(fileSource, rules, deep);
 
-  for await (const file of discoverFiles(targetDir, config.ignore)) {
-    filesScanned++;
-    // Pass deep mode flag to rules that need it
-    if (deep) file._deepMode = true;
-    for (const rule of rules) {
-      try {
-        const ruleFindings = rule.check(file);
-        findings.push(...ruleFindings);
-      } catch {
-        // A rule should never crash the entire audit.
-        // Silently skip — the rule has a bug, not the user's code.
-      }
-    }
-  }
-
-  // SCA: Dependency vulnerability scanning.
-  if (!skipSca) {
+  // SCA: Dependency vulnerability scanning (only for local scans).
+  if (!skipSca && !cliOptions.fileSource) {
     try {
       const scaFindings = await runSCA(targetDir);
       findings.push(...scaFindings);

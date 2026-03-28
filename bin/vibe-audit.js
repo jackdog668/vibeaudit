@@ -18,12 +18,14 @@
  */
 
 import { resolve } from 'node:path';
+import { stat } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { audit } from '../src/index.js';
 import { generateFixes } from '../src/fix.js';
 import { ALL_RULES } from '../src/rules/index.js';
 import { CWE_MAP } from '../src/data/cwe-map.js';
 import { bold, cyan, dim, green, red, yellow, gray } from '../src/colors.js';
+import { parseGitHubTarget, fetchRepoFiles } from '../src/github.js';
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
@@ -49,7 +51,7 @@ if (values.help) {
 ${bold('⚗️  vibe-audit')} — Security scanner for AI-generated code
 
 ${bold('USAGE')}
-  ${cyan('npx vibe-audit')} ${dim('[directory]')} ${dim('[options]')}
+  ${cyan('npx vibe-audit')} ${dim('[directory | github-url | owner/repo]')} ${dim('[options]')}
 
 ${bold('OPTIONS')}
   ${cyan('-f, --format')} <terminal|json|markdown|html>  Output format ${dim('(default: terminal)')}
@@ -70,6 +72,10 @@ ${bold('EXAMPLES')}
 
   ${dim('# Audit a specific project')}
   npx vibe-audit ./my-app
+
+  ${dim('# Audit a GitHub repo directly')}
+  npx vibe-audit https://github.com/user/repo
+  npx vibe-audit user/repo
 
   ${dim('# Get fix prompts for your AI tool')}
   npx vibe-audit --fix
@@ -130,7 +136,7 @@ if (values['list-rules']) {
 
 // ─── Run Audit ────────────────────────────────────────────────────────────────
 
-const targetDir = resolve(positionals[0] || '.');
+const rawTarget = positionals[0] || '.';
 
 const cliOptions = {
   format: values.format,
@@ -141,7 +147,38 @@ const cliOptions = {
   deep: values.deep,
 };
 
+let targetDir;
+
 try {
+  // Detect GitHub repo vs local directory.
+  const gh = parseGitHubTarget(rawTarget);
+
+  if (gh) {
+    // GitHub mode — fetch files directly via API, no clone needed.
+    const label = `${gh.owner}/${gh.repo}`;
+    console.log(cyan(`\n  ⚗️  Scanning GitHub repo: ${label}\n`));
+    targetDir = `github://${label}`;
+    cliOptions.fileSource = fetchRepoFiles(gh.owner, gh.repo);
+    cliOptions.skipSca = true; // SCA needs local package-lock.json, skip for remote
+  } else {
+    targetDir = resolve(rawTarget);
+
+    // Verify the local directory exists.
+    try {
+      const s = await stat(targetDir);
+      if (!s.isDirectory()) {
+        console.error(red(`\n  Error: ${targetDir} is not a directory\n`));
+        process.exit(2);
+      }
+    } catch {
+      console.error(red(`\n  Error: Directory not found — ${targetDir}\n`));
+      console.error(dim(`  If this is a GitHub repo, use the full URL or owner/repo shorthand:\n`));
+      console.error(dim(`    npx vibe-audit https://github.com/owner/repo`));
+      console.error(dim(`    npx vibe-audit owner/repo\n`));
+      process.exit(2);
+    }
+  }
+
   const { findings, exitCode } = await audit(targetDir, cliOptions);
 
   // Fix mode: generate prompts after the normal report
