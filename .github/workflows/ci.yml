@@ -32,6 +32,38 @@ jobs:
       - name: Verify source and regression coverage
         run: npm run verify
 
+  protection-pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Provision the pinned pilot image
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, appendFileSync } from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const { image } = JSON.parse(readFileSync('scripts/pilot-image.json', 'utf8'));
+          if (!/^node@sha256:[a-f0-9]{64}$/.test(image)) throw new Error('Invalid pilot image pin');
+          execFileSync('docker', ['pull', image], { stdio: 'inherit', timeout: 180000 });
+          appendFileSync(process.env.GITHUB_ENV, `VIBEGUARD_PILOT_IMAGE=${image}\n`);
+          NODE
+      - name: Exercise real containment and guard crash recovery
+        run: npm run test:pilot
+      - name: Retain pilot acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: protection-pilot-${{ github.run_id }}
+          path: reports/pilot-runtime.json
+          if-no-files-found: error
+          retention-days: 30
+
   vibeaudit:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -90,7 +122,7 @@ jobs:
       fail-on-vuln: true
 
   publish:
-    needs: [test, vibeaudit, gitleaks, osv]
+    needs: [test, protection-pilot, vibeaudit, gitleaks, osv]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 10

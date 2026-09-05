@@ -64,6 +64,7 @@ Never copy token values into fixtures, reports, or commits.
 | Detection or scan configuration | Positive and negative fixtures, then `npm run audit:self` |
 | CLI or reports | Invoke the CLI on a temporary fixture; assert exit status and read the generated output |
 | Agent controls or packaged skill | `npm run benchmark:agent -- --strict`; never execute fixture instructions |
+| Protection pilot | `npm run test:pilot` with a running local Linux Docker engine and a pre-pulled `VIBEGUARD_PILOT_IMAGE` digest; see the [pilot guide](docs/protection-pilot.md) |
 | Morning scan or its workflow | `node --test tests/morning-scan.test.js tests/morning-scan-runner.test.js` |
 | External adapter, approval, or publishing | Relevant adapter tests plus explicit disclosure of any service or release step not exercised |
 

@@ -20,13 +20,15 @@ inspects agent instructions and hooks offline. There is no web server or databas
 | File discovery and GitHub snapshots | `src/scanner.js`, `src/github.js` |
 | Detection and output | `src/rules/`, `src/reporter.js`, `src/reporters/` |
 | Agent Shield, VibeGuard, install checks | `src/guard/`, `bin/vibeguard.js`, `src/precheck/` |
+| Offline protection pilot | `src/guard/pilot.js`, [pilot guide](docs/protection-pilot.md) |
 | External security tools | `src/adapters/`, `src/sca/`, `src/trusted-tools.js` |
 | Scheduled portfolio scan | `scripts/morning-scan.js`, `scripts/run-morning-scan.js` |
 | Regression tests and CI | `tests/`, `.github/workflows/` |
 
 ## Boundaries
 
-- Scanned files and agent instructions are untrusted data. Never execute them.
+- Scanned files and agent instructions are untrusted data. Ordinary scans never execute them.
+  Only the explicit protection pilot runs approved snapshots in Docker; never fall back to host execution.
   Target config and inline suppressions require explicit `--trust-target-config`.
 - Preserve tool verification, approval checks, secret redaction, and incomplete-coverage failures.
   Keep credentials and scan reports out of Git. Do not install machine-wide hooks as a test.
