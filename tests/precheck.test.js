@@ -53,6 +53,12 @@ describe('precheck: spec validation (shell-injection guard)', () => {
 });
 
 describe('precheck: resolved lock parsing', () => {
+  it('uses canonical registry names for npm aliases', () => {
+    const packages = parseResolvedPackageLock({ packages: {
+      'node_modules/string-width-cjs': { name: 'string-width', version: '4.2.3' },
+    } });
+    assert.deepEqual(packages, [{ name: 'string-width', version: '4.2.3' }]);
+  });
   it('reads direct, scoped, and transitive packages from a lockfile', () => {
     const packages = parseResolvedPackageLock({
       packages: {
@@ -121,7 +127,7 @@ describe('precheck: assessPackage', () => {
     // a missing license is its own (correctly separate) finding, tested above.
     const r = assessPackage({ name: 'x', version: '1.0.0' }, { time: {}, versions: { '1.0.0': { license: 'MIT' } } }, NOW);
     assert.equal(r.ageHours, null);
-    assert.equal(r.level, 'ok', 'unknown age alone is not a finding, but must not fabricate one either');
+    assert.equal(r.level, 'block', 'unknown age must not bypass fresh-release review');
   });
 
   it('BLOCKS metadata that points the artifact at a different host', () => {
@@ -196,7 +202,7 @@ describe('precheck: whole-tree behaviour', () => {
       { name: 'innocent-wrapper', version: '1.0.0' },
       { name: 'keyv', version: '6.0.0' }, // arrives underneath, never typed
     ];
-    const fetchImpl = async (url) => ({
+    const fetchImpl = async (url, options) => url.endsWith('/querybatch') ? new Response(JSON.stringify({ results: JSON.parse(options.body).queries.map(() => ({})) })) : ({
       ok: true,
       json: async () =>
         url.includes('keyv') ? packument('6.0.0', 4) : packument('1.0.0', 24 * 300),
@@ -207,17 +213,17 @@ describe('precheck: whole-tree behaviour', () => {
     assert.equal(report.blocked[0].name, 'keyv');
   });
 
-  it('reports a registry failure as a warning, never as a pass', async () => {
+  it('blocks a registry failure because the review is incomplete', async () => {
     const resolve = () => [{ name: 'x', version: '1.0.0' }];
     const fetchImpl = async () => ({ ok: false, status: 500, json: async () => ({}) });
     const report = await precheck('x', { resolve, fetchImpl, nowMs: NOW });
-    assert.equal(report.exitCode, 1);
-    assert.match(report.warned[0].reasons[0], /could not reach the registry/);
+    assert.equal(report.exitCode, 2);
+    assert.match(report.blocked[0].reasons[0], /could not reach the registry/);
   });
 
   it('exits 0 only when every package in the tree is clean', async () => {
     const resolve = () => [{ name: 'a', version: '1.0.0' }, { name: 'b', version: '2.0.0' }];
-    const fetchImpl = async (url) => ({
+    const fetchImpl = async (url, options) => url.endsWith('/querybatch') ? new Response(JSON.stringify({ results: JSON.parse(options.body).queries.map(() => ({})) })) : ({
       ok: true,
       json: async () => (url.includes('/a') ? packument('1.0.0', 24 * 200) : packument('2.0.0', 24 * 200)),
     });

@@ -39,6 +39,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { classifyLicense } from '../rules/license-contamination.js';
+import { reviewFreshPackage } from './fresh-review.js';
+import { reviewVulnerabilities } from './vulnerability-review.js';
 import { createIsolatedNpmEnv, findTrustedNpmCli, NPM_REGISTRY } from '../trusted-tools.js';
 
 /** Severity ladder for combining independent checks without ever downgrading a finding. */
@@ -94,7 +96,9 @@ export function parseResolvedPackageLock(lock) {
     const marker = 'node_modules/';
     const index = location.lastIndexOf(marker);
     if (index < 0 || typeof metadata?.version !== 'string') continue;
-    const name = location.slice(index + marker.length);
+    // npm aliases retain the actual registry identity in metadata.name.
+    const name = metadata.name ?? location.slice(index + marker.length);
+    if (typeof name !== 'string') throw new Error('npm resolved an invalid package identity.');
     if (!/^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/i.test(name)) continue;
     packages.set(`${name}@${metadata.version}`, { name, version: metadata.version });
   }
@@ -152,6 +156,8 @@ export function resolveTree(spec) {
 export async function fetchPackument(name, fetchImpl = fetch) {
   const res = await fetchImpl(`https://registry.npmjs.org/${encodeURIComponent(name)}`, {
     headers: { Accept: 'application/json' },
+    redirect: 'error',
+    signal: AbortSignal.timeout(20000),
   });
   if (!res.ok) throw new Error(`registry ${res.status} for ${name}`);
   return res.json();
@@ -181,7 +187,11 @@ export function assessPackage(pkg, packument, nowMs) {
   }
 
   const published = packument?.time?.[pkg.version];
-  const ageHours = published ? (nowMs - Date.parse(published)) / 36e5 : null;
+  const timestamp = published ? Date.parse(published) : NaN;
+  const ageHours = Number.isFinite(timestamp) ? (nowMs - timestamp) / 36e5 : null;
+  if (ageHours === null || ageHours < 0 || !packument?.versions?.[pkg.version]) {
+    return { ...pkg, level: 'block', reasons: ['registry metadata is incomplete: exact version and valid publication date are required'], ageHours, installScripts: [] };
+  }
 
   const scripts = packument?.versions?.[pkg.version]?.scripts || {};
   const dist = packument?.versions?.[pkg.version]?.dist;
@@ -259,11 +269,25 @@ export async function precheck(spec, opts = {}) {
         // Parallelism here is the CONCURRENCY workers above; each must drain its queue serially.
         const packument = await fetchPackument(pkg.name, fetchImpl); // vibe-audit-ignore perf-no-await-parallel
         results[i] = assessPackage(pkg, packument, nowMs);
+        const result = results[i];
+        if (result.ageHours !== null && result.ageHours < FRESH_HOURS) {
+          const review = await reviewFreshPackage(pkg, packument?.versions?.[pkg.version], fetchImpl); // vibe-audit-ignore perf-no-await-parallel
+          result.review = review;
+          if (review.status === 'incomplete') {
+            result.level = 'block';
+            result.reasons.push(`fresh-release review incomplete: ${review.reason}`);
+          } else {
+            result.reasons.push(`fresh-release review: SHA-512 and registry signature verified, ${review.files} archive entries inspected, ${review.advisories.length} known OSV advisories; static checks do not prove safety`);
+            result.reasons.push(...review.findings, ...review.advisories.map((id) => `OSV advisory: ${id}`));
+            if (review.status === 'flagged' || review.installScripts.length) result.level = 'block';
+            if (review.installScripts.length) result.reasons.push('fresh archive contains install scripts; installation behavior still requires manual review');
+          }
+        }
       } catch {
         // A registry read that fails is not an all-clear. Say so.
         results[i] = {
           ...pkg,
-          level: 'warn',
+          level: 'block',
           reasons: ['could not reach the registry to check this package'],
           ageHours: null,
           installScripts: [],
@@ -273,6 +297,22 @@ export async function precheck(spec, opts = {}) {
   }
 
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, tree.length) }, worker));
+
+  const vulnerabilities = await reviewVulnerabilities(tree, fetchImpl);
+  for (let i = 0; i < results.length; i++) {
+    const review = vulnerabilities[i];
+    results[i].vulnerabilityReview = review;
+    if (review.status === 'incomplete') {
+      results[i].level = 'block';
+      results[i].reasons.push(`vulnerability review incomplete: ${review.reason}`);
+    } else if (review.advisories.length) {
+      results[i].level = 'block';
+      for (const id of review.advisories) {
+        const reason = `OSV advisory: ${id}`;
+        if (!results[i].reasons.includes(reason)) results[i].reasons.push(reason);
+      }
+    }
+  }
 
   const blocked = results.filter((r) => r.level === 'block');
   const warned = results.filter((r) => r.level === 'warn');
