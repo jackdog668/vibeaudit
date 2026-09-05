@@ -8,10 +8,43 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
-import { approvePilot, reviewPilot, revokePilot, runPilot } from '../src/guard/pilot.js';
+import { approvePilot, assertPilotIsolation, reviewPilot, revokePilot, runPilot } from '../src/guard/pilot.js';
 
 const image = `node@sha256:${'a'.repeat(64)}`;
 const entrySource = "import { add } from './helper.mjs';\nconsole.log(add(2, 3));\n";
+
+test('pilot accepts Docker-normalized capabilities but refuses extra privileges or missing restrictions', () => {
+  const review = { entry: 'run.mjs', policy: { seconds: 30 } };
+  const mounts = ['skill', 'input', 'runner'].map((name) => ({ source: `/staged/${name}`, target: `/${name}` }));
+  const inspection = {
+    Image: 'sha256:fixture',
+    Config: { User: '0:0', WorkingDir: '/tmp', Entrypoint: ['/usr/local/bin/node'],
+      Cmd: ['/runner/supervisor.mjs', '/skill/run.mjs', '30'],
+      Labels: { 'dev.vibeaudit.pilot': 'fixture' }, Healthcheck: { Test: ['NONE'] }, Env: ['NODE_OPTIONS='] },
+    HostConfig: { NetworkMode: 'none', ReadonlyRootfs: true, Privileged: false, PidMode: '', IpcMode: 'none',
+      RestartPolicy: { Name: 'no' }, AutoRemove: false, CapDrop: ['ALL'], CapAdd: ['CAP_SETUID', 'CAP_KILL', 'CAP_SETGID'],
+      SecurityOpt: ['no-new-privileges:true'], PidsLimit: 64, Memory: 268435456, MemorySwap: 268435456, NanoCpus: 1000000000,
+      LogConfig: { Type: 'none' }, Tmpfs: { '/tmp': 'rw,noexec,nosuid,nodev,size=16m,mode=1777' },
+      Mounts: mounts.map(({ source, target }) => ({ Type: 'bind', Source: source, Target: target, ReadOnly: true })) },
+    Mounts: mounts.map(({ target }) => ({ Type: 'bind', Destination: target, RW: false })),
+  };
+  assert.doesNotThrow(() => assertPilotIsolation(inspection, review, 'fixture', mounts, 'sha256:fixture'));
+  for (const change of [
+    (v) => v.HostConfig.CapAdd.push('CAP_SYS_ADMIN'),
+    (v) => { v.HostConfig.CapDrop = []; },
+    (v) => { v.HostConfig.NetworkMode = 'bridge'; },
+    (v) => { v.HostConfig.ReadonlyRootfs = false; },
+    (v) => { v.HostConfig.SecurityOpt = []; },
+    (v) => { v.HostConfig.Mounts[0].Source = '/host-home'; },
+    (v) => { v.Mounts[0].RW = true; },
+    (v) => { v.Config.Env.push('HTTP_PROXY=http://host'); },
+    (v) => { v.HostConfig.PidsLimit = 0; },
+  ]) {
+    const changed = structuredClone(inspection);
+    change(changed);
+    assert.throws(() => assertPilotIsolation(changed, review, 'fixture', mounts, 'sha256:fixture'), /isolation policy/);
+  }
+});
 
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'vibeguard-pilot-test-'));

@@ -245,9 +245,11 @@ function createArgs(review, name, mounts) {
     review.image, '/runner/supervisor.mjs', `/skill/${review.entry}`, String(review.policy.seconds)];
 }
 
-function assertIsolation(container, review, name, mounts, imageId) {
+export function assertPilotIsolation(container, review, name, mounts, imageId) {
   const h = container.HostConfig, c = container.Config;
   const equalSet = (actual, expected) => json([...(actual || [])].map((v) => v.toUpperCase()).sort()) === json([...expected].sort());
+  // Docker normalizes SETUID to CAP_SETUID in its inspection response.
+  const capabilities = (values) => (values || []).map((value) => value.replace(/^CAP_/i, ''));
   const actualMounts = container.Mounts || [];
   const requestedMounts = h.Mounts || [];
   if (container.Image !== imageId || c.User !== '0:0' || c.WorkingDir !== '/tmp' ||
@@ -255,8 +257,8 @@ function assertIsolation(container, review, name, mounts, imageId) {
       json(c.Cmd) !== json(['/runner/supervisor.mjs', `/skill/${review.entry}`, String(review.policy.seconds)]) ||
       c.Labels?.['dev.vibeaudit.pilot'] !== name || json(c.Healthcheck?.Test) !== json(['NONE']) ||
       h.NetworkMode !== 'none' || !h.ReadonlyRootfs || h.Privileged || h.PidMode || h.IpcMode !== 'none' ||
-      h.RestartPolicy?.Name !== 'no' || h.AutoRemove || !equalSet(h.CapDrop, ['ALL']) ||
-      !equalSet(h.CapAdd, ['KILL', 'SETGID', 'SETUID']) ||
+      h.RestartPolicy?.Name !== 'no' || h.AutoRemove || !equalSet(capabilities(h.CapDrop), ['ALL']) ||
+      !equalSet(capabilities(h.CapAdd), ['KILL', 'SETGID', 'SETUID']) ||
       !equalSet(h.SecurityOpt, ['NO-NEW-PRIVILEGES:TRUE']) || h.PidsLimit !== 64 ||
       h.Memory !== 256 * 1024 * 1024 || h.MemorySwap !== h.Memory || h.NanoCpus !== 1e9 ||
       h.LogConfig?.Type !== 'none' || Object.keys(h.Tmpfs || {}).length !== 1 ||
@@ -311,7 +313,7 @@ export async function runPilot(id, { store } = {}) {
     created = true; // Also clean up a create request whose response was lost.
     await docker.checked(createArgs(review, receipt.containerName, mounts));
     const [inspection] = JSON.parse(await docker.checked(['inspect', receipt.containerName]));
-    assertIsolation(inspection, review, receipt.containerName, mounts, imageInfo.Id);
+    assertPilotIsolation(inspection, review, receipt.containerName, mounts, imageInfo.Id);
     receipt.isolationVerified = true;
     receipt.enforced = { network: inspection.HostConfig.NetworkMode, readOnlyRootfs: inspection.HostConfig.ReadonlyRootfs,
       securityOptions: inspection.HostConfig.SecurityOpt, capDrop: inspection.HostConfig.CapDrop, capAdd: inspection.HostConfig.CapAdd,
