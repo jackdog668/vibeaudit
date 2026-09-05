@@ -29,14 +29,8 @@ jobs:
 
       - run: npm ci --ignore-scripts
 
-      - name: Verify official skill baseline is current
-        run: npm run bundle:check
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Test
-        run: npm test
+      - name: Verify source and regression coverage
+        run: npm run verify
 
   vibeaudit:
     runs-on: ubuntu-latest
@@ -53,8 +47,10 @@ jobs:
       - run: npm ci --ignore-scripts
 
       - name: Self-scan with vibeaudit (strict)
+        shell: bash
+        # Apply this repository's reviewed self-scan scope, just as local verification does.
         # The independent pinned OSV job below supplies CI dependency coverage.
-        run: node bin/vibe-audit.js . --skip-osv --format json --strict | tee vibeaudit-report.json
+        run: npm run --silent audit:self -- --format json | tee vibeaudit-report.json
 
       - name: Upload vibeaudit report
         if: always()
@@ -62,6 +58,7 @@ jobs:
         with:
           name: vibeaudit-report-${{ github.run_id }}
           path: vibeaudit-report.json
+          if-no-files-found: error
           retention-days: 90
 
   gitleaks:

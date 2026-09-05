@@ -13,6 +13,7 @@
  *   --owner <name>      GitHub owner for --discover (default: buildwithdesi)
  *   --concurrency <N>   Parallel scans (default: 3)
  *   --format <fmt>      Report format (default: markdown)
+ *   --output-dir <dir>  Report directory (default: reports/)
  */
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
@@ -273,7 +274,7 @@ async function main() {
   results.sort((a, b) => gradeOrder[a.grade] - gradeOrder[b.grade]);
 
   const report = generateReport(results, errors, repos.length, durationSec);
-  const outDir = join(ROOT, 'reports');
+  const outDir = flag('output-dir', join(ROOT, 'reports'));
   await mkdir(outDir, { recursive: true });
 
   const dateStr = new Date().toISOString().split('T')[0];
