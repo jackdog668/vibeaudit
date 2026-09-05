@@ -8,8 +8,12 @@ import { analyzeAgentControlContent, isAgentControlPath } from '../src/guard/age
 import { inspectAgentBaseline, trustCurrentAgentFiles, trustOneAgentFile } from '../src/guard/baseline.js';
 import { analyzeCommand } from '../src/guard/command.js';
 import { approveReviewCommand, consumeReviewApproval } from '../src/guard/approvals.js';
+import { pilotCli } from '../src/guard/pilot-cli.js';
 
 const [commandName, ...rest] = process.argv.slice(2);
+if (commandName === 'pilot') {
+  process.exitCode = await pilotCli(rest);
+} else {
 const { values, positionals } = parseArgs({
   args: rest,
   allowPositionals: true,
@@ -134,10 +138,11 @@ try {
       break;
     }
     default:
-      console.log(`VibeGuard\n\nCommands:\n  check-command --command <text>\n  approve-command\n  scan-agent-file <path>\n  preflight [--json]\n  status [--json]\n  trust-current --i-reviewed-these-files\n  trust-file <path> --i-reviewed-this-file`);
+      console.log(`VibeGuard\n\nCommands:\n  pilot (offline protection pilot; use pilot --help)\n  check-command --command <text>\n  approve-command\n  scan-agent-file <path>\n  preflight [--json]\n  status [--json]\n  trust-current --i-reviewed-these-files\n  trust-file <path> --i-reviewed-this-file`);
       process.exitCode = commandName ? 2 : 0;
   }
 } catch (error) {
   console.error(`VibeGuard: ${error.message}`);
   process.exitCode = 4;
+}
 }

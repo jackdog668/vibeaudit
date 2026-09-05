@@ -70,6 +70,12 @@ Requires Node `>=18.19.0`.
 
 ## VibeGuard: Protection Outside the Project Folder
 
+The new **offline protection pilot** runs an explicitly reviewed Node skill in a
+restricted Linux Docker container. It binds approval to the exact skill and input,
+disables networking, and records execution and cleanup evidence. Start with
+`node bin/vibeguard.js pilot --help` and the [pilot guide](docs/protection-pilot.md).
+This is an opt-in execution pilot; live AI assistants and provider access are outside its scope.
+
 The scanner checks a project when you run it. **VibeGuard** adds user-wide checks that run before supported AI tools or interactive PowerShell execute a command.
 
 ### Check local security tools
