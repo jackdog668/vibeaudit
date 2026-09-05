@@ -48,8 +48,9 @@ jobs:
 
       - name: Self-scan with vibeaudit (strict)
         shell: bash
+        # Apply this repository's reviewed self-scan scope, just as local verification does.
         # The independent pinned OSV job below supplies CI dependency coverage.
-        run: node bin/vibe-audit.js . --skip-osv --format json --strict | tee vibeaudit-report.json
+        run: npm run --silent audit:self -- --format json | tee vibeaudit-report.json
 
       - name: Upload vibeaudit report
         if: always()

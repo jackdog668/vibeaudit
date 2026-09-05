@@ -69,7 +69,9 @@ Never copy token values into fixtures, reports, or commits.
 
 `npm run audit:self` uses this checkout's reviewed config in strict mode. It skips
 OSV but still invokes npm dependency analysis, so it is not an offline test.
-CI separately runs a strict untrusted-config scan, Gitleaks, and pinned OSV.
+CI runs the same strict self-scan with this repository's reviewed config,
+plus independent Gitleaks and pinned OSV checks. Ordinary target scans still
+ignore target-controlled exclusions and suppressions unless explicitly trusted.
 Passing the local source gate does not prove those external jobs passed.
 
 For the portfolio scan, use `npm run scan:morning -- --top 1` with authorized
