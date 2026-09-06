@@ -70,6 +70,24 @@ Requires Node `>=18.19.0`.
 
 ## VibeGuard: Protection Outside the Project Folder
 
+### Review and install an npm dependency
+
+The protected npm workflow reviews dependencies against your app's actual manifest
+and lockfile, then installs the exact reviewed archives offline with scripts disabled.
+It retains the previous installation for rollback. From this checkout:
+
+```bash
+node bin/vibeguard.js npm review picocolors@1.1.1 --project /path/to/app
+# Read the package results, then use the returned ID in both positions:
+node bin/vibeguard.js npm install <review-id> --accept <review-id>
+node bin/vibeguard.js npm status <review-id>
+node bin/vibeguard.js npm rollback <review-id>
+```
+
+The first version supports single projects using the public npm registry. It does
+not run installation scripts or protect later application execution. See the
+[installation guide](docs/protected-npm-install.md) for approval, recovery, and limits.
+
 The new **offline protection pilot** runs an explicitly reviewed Node skill in a
 restricted Linux Docker container. It binds approval to the exact skill and input,
 disables networking, and records execution and cleanup evidence. Start with
