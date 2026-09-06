@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   test:
+    name: test (${{ matrix.display || matrix.node-version }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
 
@@ -22,6 +23,7 @@ jobs:
         include:
           - os: windows-latest
             node-version: 22
+            display: Windows Node 22
 
     steps:
       - uses: actions/checkout@v4
